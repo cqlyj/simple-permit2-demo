@@ -86,8 +86,8 @@ contract Permit2Bank {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(IPermit2 _i_permit2) {
-        i_permit2 = _i_permit2;
+    constructor(address _i_permit2) {
+        i_permit2 = IPermit2(_i_permit2);
     }
 
     /*//////////////////////////////////////////////////////////////
