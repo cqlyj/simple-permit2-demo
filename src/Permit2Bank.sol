@@ -226,7 +226,14 @@ contract Permit2Bank {
         // Transfer tokens from the caller to this contract
         i_permit2.permitTransferFrom(
             // The permit message. Spender is inferred as the caller (this contract)
-            permitFrom,
+            ISignatureTransfer.PermitTransferFrom({
+                permitted: permitFrom.permitted,
+                // Under the hood, nonces are actually written as bit fields in an storage slot indexed by the upper 248 bits.
+                // You can save a signficant amount of gas by carefully choosing nonce values that reuse storage slots.
+                // https://docs.uniswap.org/contracts/permit2/reference/signature-transfer#nonce-schema
+                nonce: i_permit2.nonceBitmap(msg.sender, permitFrom.nonce),
+                deadline: permitFrom.deadline
+            }),
             // The transfer recipient and amount.
             ISignatureTransfer.SignatureTransferDetails({
                 to: address(this),
@@ -267,7 +274,11 @@ contract Permit2Bank {
         );
 
         i_permit2.permitWitnessTransferFrom(
-            permitFrom,
+            ISignatureTransfer.PermitTransferFrom({
+                permitted: permitFrom.permitted,
+                nonce: i_permit2.nonceBitmap(msg.sender, permitFrom.nonce),
+                deadline: permitFrom.deadline
+            }),
             ISignatureTransfer.SignatureTransferDetails({
                 to: address(this),
                 requestedAmount: permitFrom.permitted.amount
@@ -302,7 +313,11 @@ contract Permit2Bank {
         }
 
         i_permit2.permitTransferFrom(
-            permitBatchFrom,
+            ISignatureTransfer.PermitBatchTransferFrom({
+                permitted: permitBatchFrom.permitted,
+                nonce: i_permit2.nonceBitmap(msg.sender, permitBatchFrom.nonce),
+                deadline: permitBatchFrom.deadline
+            }),
             transferDetails,
             msg.sender,
             signature
@@ -333,7 +348,11 @@ contract Permit2Bank {
         );
 
         i_permit2.permitWitnessTransferFrom(
-            permitBatchFrom,
+            ISignatureTransfer.PermitBatchTransferFrom({
+                permitted: permitBatchFrom.permitted,
+                nonce: i_permit2.nonceBitmap(msg.sender, permitBatchFrom.nonce),
+                deadline: permitBatchFrom.deadline
+            }),
             transferDetails,
             msg.sender,
             witness,
