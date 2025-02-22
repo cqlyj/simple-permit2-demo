@@ -59,6 +59,10 @@ contract Permit2Bank {
         address indexed user,
         IAllowanceTransfer.PermitDetails[] details
     );
+    event DepositBatch(
+        address indexed user,
+        ISignatureTransfer.SignatureTransferDetails[] details
+    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -277,7 +281,30 @@ contract Permit2Bank {
         );
     }
 
-    function depositBatchWithSignatureTransferWithoutWitness() external {}
+    ///
+    /// @param permitBatchFrom The permit message signed for multiple token transfers
+    /// @param signature The off-chain signature for the permit message
+    /// @notice Most of the logic is the same as depositWithSignatureTransferWithoutWitness() but with multiple token transfers.
+    function depositBatchWithSignatureTransferWithoutWitness(
+        ISignatureTransfer.PermitBatchTransferFrom calldata permitBatchFrom,
+        ISignatureTransfer.SignatureTransferDetails[] calldata transferDetails,
+        bytes calldata signature
+    ) external {
+        for (uint256 i = 0; i < transferDetails.length; i++) {
+            s_userToTokenAmount[msg.sender][
+                permitBatchFrom.permitted[i].token
+            ] += permitBatchFrom.permitted[i].amount;
+        }
+
+        i_permit2.permitTransferFrom(
+            permitBatchFrom,
+            transferDetails,
+            msg.sender,
+            signature
+        );
+
+        emit DepositBatch(msg.sender, transferDetails);
+    }
 
     function depositBatchWithSignatureTransferWithWitness() external {}
 
