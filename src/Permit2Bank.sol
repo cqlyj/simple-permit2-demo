@@ -163,12 +163,57 @@ contract Permit2Bank {
         emit DepositBatch(msg.sender, permitBatch.details);
     }
 
-    function depositWithSignatureTransfer(
+    ///
+    /// @param permitFrom The permit message signed for a single token transfer
+    /// @param signature The off-chain signature for the permit message
+    /// @dev The PermitTransferFrom struct is defined in ISignatureTransfer.sol contains the following fields:
+    /// @dev - TokenPermissions permitted
+    /// @dev   - address token
+    /// @dev   - uint160 amount
+    /// @dev - uint256 nonce
+    /// @dev - uint256 deadline => deadline on the permit signature
+    /// @notice Instead of changing an allowance mapping in Permit2, we can call permitTransferFrom() immediately
+    /// @notice As long as the signature and permit data are successfully verified.
+    /// @notice This is more gas efficient due to fewer state updates, and best suited for situations where multiple transfers are not expected.
+    /// @notice Signatures associated with a specific permission request cannot be reused because upon transfer completion the associated nonce is flipped from 0 to 1.
+    /// @notice There is no method to "get the current nonce" as with Allowance Transfers because nonces are stored as bits in an unordered manner within a bitmap.
+    /// @notice You can generate nonces in any way you wish as long as the generation technique does not cause collisions => Incrementation or randomness (with a sufficiently large range) are both valid.
+    /// @notice Normal SignatureTransfer
+    function depositWithSignatureTransferWithoutWitness(
         ISignatureTransfer.PermitTransferFrom calldata permitFrom,
         bytes calldata signature
-    ) external {}
+    ) external {
+        s_userToTokenAmount[msg.sender][
+            permitFrom.permitted.token
+        ] += permitFrom.permitted.amount;
 
-    function depositBatchWithSignatureTransfer() external {}
+        // Transfer tokens from the caller to this contract
+        i_permit2.permitTransferFrom(
+            // The permit message. Spender is inferred as the caller (this contract)
+            permitFrom,
+            // The transfer recipient and amount.
+            ISignatureTransfer.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: permitFrom.permitted.amount
+            }),
+            // The owner of the tokens, which must also be the signer of the message, otherwise this call will fail.
+            msg.sender,
+            // The packed signature that was the result of signing the EIP712 hash of `permit`.
+            signature
+        );
+
+        emit Deposit(
+            msg.sender,
+            permitFrom.permitted.token,
+            permitFrom.permitted.amount
+        );
+    }
+
+    function depositWithSignatureTransferWithWitness() external {}
+
+    function depositBatchWithSignatureTransferWithoutWitness() external {}
+
+    function depositBatchWithSignatureTransferWithWitness() external {}
 
     function withdraw() external {}
 
