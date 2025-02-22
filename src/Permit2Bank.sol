@@ -141,7 +141,32 @@ contract Permit2Bank {
         emit DepositBatch(msg.sender, permitBatch.details);
     }
 
-    function depositWithSignatureTransfer() external {}
+    function depositBatchWithAllowanceTransferPermitNotRequired(
+        IAllowanceTransfer.PermitBatch calldata permitBatch
+    ) external {
+        for (uint256 i = 0; i < permitBatch.details.length; i++) {
+            s_userToTokenAmount[msg.sender][
+                permitBatch.details[i].token
+            ] += permitBatch.details[i].amount;
+        }
+
+        // Transfers the allowed tokens from user to spender (our contract)
+        for (uint256 i = 0; i < permitBatch.details.length; i++) {
+            i_permit2.transferFrom(
+                msg.sender,
+                address(this),
+                permitBatch.details[i].amount,
+                permitBatch.details[i].token
+            );
+        }
+
+        emit DepositBatch(msg.sender, permitBatch.details);
+    }
+
+    function depositWithSignatureTransfer(
+        ISignatureTransfer.PermitTransferFrom calldata permitFrom,
+        bytes calldata signature
+    ) external {}
 
     function depositBatchWithSignatureTransfer() external {}
 
