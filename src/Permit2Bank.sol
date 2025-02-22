@@ -269,6 +269,7 @@ contract Permit2Bank {
 
     ///
     /// @param permitBatchFrom The permit message signed for multiple token transfers
+    /// @param transferDetails The transfer details for each token
     /// @param signature The off-chain signature for the permit message
     /// @notice Most of the logic is the same as depositWithSignatureTransferWithoutWitness() but with multiple token transfers.
     function depositBatchWithSignatureTransferWithoutWitness(
@@ -292,7 +293,38 @@ contract Permit2Bank {
         emit DepositBatch(msg.sender, transferDetails);
     }
 
-    function depositBatchWithSignatureTransferWithWitness() external {}
+    ///
+    /// @param permitBatchFrom The permit message signed for multiple token transfers
+    /// @param transferDetails The transfer details for each token
+    /// @param user The extra witness data
+    /// @param signature The off-chain signature for the permit message
+    function depositBatchWithSignatureTransferWithWitness(
+        ISignatureTransfer.PermitBatchTransferFrom calldata permitBatchFrom,
+        ISignatureTransfer.SignatureTransferDetails[] calldata transferDetails,
+        address user,
+        bytes calldata signature
+    ) external {
+        for (uint256 i = 0; i < transferDetails.length; i++) {
+            s_userToTokenAmount[msg.sender][
+                permitBatchFrom.permitted[i].token
+            ] += permitBatchFrom.permitted[i].amount;
+        }
+
+        bytes32 witness = keccak256(
+            abi.encode(WITNESS_TYPEHASH, Witness(user))
+        );
+
+        i_permit2.permitWitnessTransferFrom(
+            permitBatchFrom,
+            transferDetails,
+            msg.sender,
+            witness,
+            WITNESS_TYPE_STRING,
+            signature
+        );
+
+        emit DepositBatch(msg.sender, transferDetails);
+    }
 
     function withdraw() external {}
 
