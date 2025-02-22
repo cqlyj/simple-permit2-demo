@@ -27,6 +27,10 @@ contract Permit2Bank {
     //////////////////////////////////////////////////////////////*/
 
     event Deposit(address indexed user, address indexed token, uint256 amount);
+    event DepositBatch(
+        address indexed user,
+        IAllowanceTransfer.PermitDetails[] details
+    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -100,7 +104,42 @@ contract Permit2Bank {
         emit Deposit(msg.sender, token, amount);
     }
 
-    function depositBatchWithAllowanceTransfer() external {}
+    ///
+    /// @param permitBatch The permit message signed for multiple token allowances
+    /// @param signature The off-chain signature for the permit message
+    /// @dev The PermitBatch struct is defined in IAllowanceTransfer.sol with the only one field changed from PermitSingle:
+    /// @dev - PermitDetails[] details
+    /// @notice Most of the logic is the same as depositWithAllowanceTransferPermitRequired() but with multiple token allowances.
+    function depositBatchWithAllowanceTransferPermitRequired(
+        IAllowanceTransfer.PermitBatch calldata permitBatch,
+        bytes calldata signature
+    ) external {
+        // This contract must have spending permissions for the user.
+        if (permitBatch.spender != address(this))
+            revert Permit2Bank__InvalidSpender();
+
+        // Credit the caller
+        for (uint256 i = 0; i < permitBatch.details.length; i++) {
+            s_userToTokenAmount[msg.sender][
+                permitBatch.details[i].token
+            ] += permitBatch.details[i].amount;
+        }
+
+        // owner is explicitly msg.sender
+        i_permit2.permit(msg.sender, permitBatch, signature);
+
+        // Transfers the allowed tokens from user to spender (our contract)
+        for (uint256 i = 0; i < permitBatch.details.length; i++) {
+            i_permit2.transferFrom(
+                msg.sender,
+                address(this),
+                permitBatch.details[i].amount,
+                permitBatch.details[i].token
+            );
+        }
+
+        emit DepositBatch(msg.sender, permitBatch.details);
+    }
 
     function depositWithSignatureTransfer() external {}
 
