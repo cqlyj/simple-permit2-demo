@@ -70,6 +70,12 @@ contract Permit2Bank {
         uint256 amount,
         address indexed recipient
     );
+    event WithdrawBatch(
+        address indexed user,
+        address[] tokens,
+        uint160[] amounts,
+        address indexed recipient
+    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -352,6 +358,25 @@ contract Permit2Bank {
         IERC20(token).safeTransfer(recipient, amount);
 
         emit Withdraw(msg.sender, token, amount, recipient);
+    }
+
+    function withdrawBatch(
+        address[] calldata tokens,
+        uint160[] calldata amounts,
+        address recipient
+    ) external {
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (s_userToTokenAmount[msg.sender][tokens[i]] < amounts[i]) {
+                revert Permit2Bank__InsufficientTokenBalance(
+                    s_userToTokenAmount[msg.sender][tokens[i]]
+                );
+            }
+
+            s_userToTokenAmount[msg.sender][tokens[i]] -= amounts[i];
+            IERC20(tokens[i]).safeTransfer(recipient, amounts[i]);
+        }
+
+        emit WithdrawBatch(msg.sender, tokens, amounts, recipient);
     }
 
     /*//////////////////////////////////////////////////////////////
