@@ -49,6 +49,7 @@ contract Permit2Bank {
     //////////////////////////////////////////////////////////////*/
 
     error Permit2Bank__InvalidSpender();
+    error Permit2Bank__InsufficientTokenBalance(uint256 currentBalance);
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -62,6 +63,12 @@ contract Permit2Bank {
     event DepositBatch(
         address indexed user,
         ISignatureTransfer.SignatureTransferDetails[] details
+    );
+    event Withdraw(
+        address indexed user,
+        address indexed token,
+        uint256 amount,
+        address indexed recipient
     );
 
     /*//////////////////////////////////////////////////////////////
@@ -326,7 +333,26 @@ contract Permit2Bank {
         emit DepositBatch(msg.sender, transferDetails);
     }
 
-    function withdraw() external {}
+    ///
+    /// @param token The token to withdraw
+    /// @param amount The amount to withdraw
+    /// @param recipient The recipient of the withdrawn tokens
+    function withdraw(
+        address token,
+        uint160 amount,
+        address recipient
+    ) external {
+        if (s_userToTokenAmount[msg.sender][token] < amount) {
+            revert Permit2Bank__InsufficientTokenBalance(
+                s_userToTokenAmount[msg.sender][token]
+            );
+        }
+
+        s_userToTokenAmount[msg.sender][token] -= amount;
+        IERC20(token).safeTransfer(recipient, amount);
+
+        emit Withdraw(msg.sender, token, amount, recipient);
+    }
 
     /*//////////////////////////////////////////////////////////////
                      INTERNAL AND PRIVATE FUNCTIONS
