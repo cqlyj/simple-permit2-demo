@@ -70,6 +70,13 @@ contract Permit2Bank {
 
         // owner is explicitly msg.sender
         i_permit2.permit(msg.sender, permitSingle, signature);
+        // Transfers the allowed tokens from user to spender (our contract)
+        i_permit2.transferFrom(
+            msg.sender,
+            address(this),
+            permitSingle.details.amount,
+            permitSingle.details.token
+        );
 
         emit Deposit(
             msg.sender,
@@ -78,7 +85,20 @@ contract Permit2Bank {
         );
     }
 
-    function depositWithAllowanceTransferPermitNotRequired() external {}
+    ///
+    /// @param token The token to deposit
+    /// @param amount The amount to deposit
+    /// @notice Allowance Transfer when permit has already been called and isn't expired and within allowed amount.
+    /// @notice i_permit2._transfer() performs all the necessary security checks to ensure the allowance mapping for the spender is not expired and within allowed amount.
+    function depositWithAllowanceTransferPermitNotRequired(
+        address token,
+        uint160 amount
+    ) external {
+        s_userToTokenAmount[msg.sender][token] += amount;
+        i_permit2.transferFrom(msg.sender, address(this), amount, token);
+
+        emit Deposit(msg.sender, token, amount);
+    }
 
     function depositBatchWithAllowanceTransfer() external {}
 
