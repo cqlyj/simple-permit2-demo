@@ -16,6 +16,34 @@ contract Permit2Bank {
     mapping(address user => mapping(address token => uint256 amount))
         private s_userToTokenAmount;
 
+    /// @dev A string that defines the typed data that the witness was hashed from. It must also include the TokenPermissions struct and comply with EIP-712 struct ordering.
+    /// @notice Structs are alphabetical!
+    /// @notice When hashing multiple typed structs, the ordering of the structs in the type string matters. Referencing EIP-721:
+    /// @notice If the struct type references other struct types (and these in turn reference even more struct types),
+    /// @notice then the set of referenced struct types is collected,
+    /// @notice sorted by name and appended to the encoding.
+    /// @notice An example encoding is Transaction(Person from,Person to,Asset tx)Asset(address token,uint256 amount)Person(address wallet,string name)
+    /// @dev The full type string with witness:
+    /// @dev "PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,Witness witness)TokenPermissions(address token,uint256 amount)Witness(address user)"
+    /// @dev However, we only want to REMAINING EIP-712 structured type definition,
+    /// @dev starting exactly with the witness.
+    /// @dev The ""PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline," comes from `PermitHash` library:
+    /// @dev string public constant _PERMIT_TRANSFER_FROM_WITNESS_TYPEHASH_STUB =
+    /// @dev    "PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,";
+    string private constant WITNESS_TYPE_STRING =
+        "Witness witness)TokenPermissions(address token,uint256 amount)Witness(address user)";
+
+    // The type hash must hash our created witness struct.
+    bytes32 constant WITNESS_TYPEHASH = keccak256("Witness(address user)");
+
+    /*//////////////////////////////////////////////////////////////
+                                STRUCTS
+    //////////////////////////////////////////////////////////////*/
+
+    struct Witness {
+        address user;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -209,7 +237,45 @@ contract Permit2Bank {
         );
     }
 
-    function depositWithSignatureTransferWithWitness() external {}
+    ///
+    /// @param permitFrom The permit message signed for a single token transfer
+    /// @param user The extra witness data
+    /// @param signature The off-chain signature for the permit message
+    /// @notice Custom data called the "witness" can be added to signatures.
+    /// @notice This is useful when using relayers or specifying custom order details
+    /// @notice Extremely useful to add validation to the rest of the interaction when employing the relayer approach.
+    /// @dev The witness data requires the creation of a custom witness struct, along with the associated type string and type hash.
+    function depositWithSignatureTransferWithWitness(
+        ISignatureTransfer.PermitTransferFrom calldata permitFrom,
+        address user,
+        bytes calldata signature
+    ) external {
+        s_userToTokenAmount[msg.sender][
+            permitFrom.permitted.token
+        ] += permitFrom.permitted.amount;
+
+        bytes32 witness = keccak256(
+            abi.encode(WITNESS_TYPEHASH, Witness(user))
+        );
+
+        i_permit2.permitWitnessTransferFrom(
+            permitFrom,
+            ISignatureTransfer.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: permitFrom.permitted.amount
+            }),
+            msg.sender, // The owner of the tokens has to be the signer
+            witness, // Witness - Extra data to include when checking the user signature
+            WITNESS_TYPE_STRING, // EIP-712 type definition for REMAINING string stub of the typehash
+            signature // The resulting signature from signing hash of permit data per EIP-712 standards
+        );
+
+        emit Deposit(
+            msg.sender,
+            permitFrom.permitted.token,
+            permitFrom.permitted.amount
+        );
+    }
 
     function depositBatchWithSignatureTransferWithoutWitness() external {}
 
