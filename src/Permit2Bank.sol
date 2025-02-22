@@ -348,13 +348,7 @@ contract Permit2Bank {
         uint160 amount,
         address recipient
     ) external {
-        if (s_userToTokenAmount[msg.sender][token] < amount) {
-            revert Permit2Bank__InsufficientTokenBalance(
-                s_userToTokenAmount[msg.sender][token]
-            );
-        }
-
-        s_userToTokenAmount[msg.sender][token] -= amount;
+        _checkAndUpdateBalance(msg.sender, token, amount);
         IERC20(token).safeTransfer(recipient, amount);
 
         emit Withdraw(msg.sender, token, amount, recipient);
@@ -366,13 +360,7 @@ contract Permit2Bank {
         address recipient
     ) external {
         for (uint256 i = 0; i < tokens.length; i++) {
-            if (s_userToTokenAmount[msg.sender][tokens[i]] < amounts[i]) {
-                revert Permit2Bank__InsufficientTokenBalance(
-                    s_userToTokenAmount[msg.sender][tokens[i]]
-                );
-            }
-
-            s_userToTokenAmount[msg.sender][tokens[i]] -= amounts[i];
+            _checkAndUpdateBalance(msg.sender, tokens[i], amounts[i]);
             IERC20(tokens[i]).safeTransfer(recipient, amounts[i]);
         }
 
@@ -382,4 +370,17 @@ contract Permit2Bank {
     /*//////////////////////////////////////////////////////////////
                      INTERNAL AND PRIVATE FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    function _checkAndUpdateBalance(
+        address user,
+        address token,
+        uint256 amount
+    ) internal {
+        if (s_userToTokenAmount[user][token] < amount) {
+            revert Permit2Bank__InsufficientTokenBalance(
+                s_userToTokenAmount[user][token]
+            );
+        }
+        s_userToTokenAmount[user][token] -= amount;
+    }
 }
