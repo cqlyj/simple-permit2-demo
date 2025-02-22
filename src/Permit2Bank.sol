@@ -5,6 +5,11 @@ import {IPermit2, IAllowanceTransfer, ISignatureTransfer} from "permit2/src/inte
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
+/// @title Permit2Bank
+/// @author Luo Yingjie
+/// @notice This is a simple bank that users can deposit ERC20 tokens into using Permit2, which they can later withdraw.
+/// @notice Normally this requires granting an allowance to the bank contract and then having the bank perform the transferFrom() on the token itself
+/// @notice but Permit2 allows us to skip that hassle!
 contract Permit2Bank {
     using SafeERC20 for IERC20;
 
@@ -382,5 +387,20 @@ contract Permit2Bank {
             );
         }
         s_userToTokenAmount[user][token] -= amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function getUserTokenAmount(
+        address user,
+        address token
+    ) external view returns (uint256) {
+        return s_userToTokenAmount[user][token];
+    }
+
+    function getPermit2() external view returns (IPermit2) {
+        return i_permit2;
     }
 }
