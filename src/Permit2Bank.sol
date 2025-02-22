@@ -57,7 +57,7 @@ contract Permit2Bank {
     event Deposit(address indexed user, address indexed token, uint256 amount);
     event DepositBatch(
         address indexed user,
-        IAllowanceTransfer.PermitDetails[] details
+        IAllowanceTransfer.AllowanceTransferDetails[] details
     );
     event DepositBatch(
         address indexed user,
@@ -144,6 +144,7 @@ contract Permit2Bank {
     /// @notice Most of the logic is the same as depositWithAllowanceTransferPermitRequired() but with multiple token allowances.
     function depositBatchWithAllowanceTransferPermitRequired(
         IAllowanceTransfer.PermitBatch calldata permitBatch,
+        IAllowanceTransfer.AllowanceTransferDetails[] calldata transferDetails,
         bytes calldata signature
     ) external {
         // This contract must have spending permissions for the user.
@@ -161,38 +162,23 @@ contract Permit2Bank {
         i_permit2.permit(msg.sender, permitBatch, signature);
 
         // Transfers the allowed tokens from user to spender (our contract)
-        for (uint256 i = 0; i < permitBatch.details.length; i++) {
-            i_permit2.transferFrom(
-                msg.sender,
-                address(this),
-                permitBatch.details[i].amount,
-                permitBatch.details[i].token
-            );
-        }
+        i_permit2.transferFrom(transferDetails);
 
-        emit DepositBatch(msg.sender, permitBatch.details);
+        emit DepositBatch(msg.sender, transferDetails);
     }
 
     function depositBatchWithAllowanceTransferPermitNotRequired(
-        IAllowanceTransfer.PermitBatch calldata permitBatch
+        IAllowanceTransfer.AllowanceTransferDetails[] calldata transferDetails
     ) external {
-        for (uint256 i = 0; i < permitBatch.details.length; i++) {
+        for (uint256 i = 0; i < transferDetails.length; i++) {
             s_userToTokenAmount[msg.sender][
-                permitBatch.details[i].token
-            ] += permitBatch.details[i].amount;
+                transferDetails[i].token
+            ] += transferDetails[i].amount;
         }
 
-        // Transfers the allowed tokens from user to spender (our contract)
-        for (uint256 i = 0; i < permitBatch.details.length; i++) {
-            i_permit2.transferFrom(
-                msg.sender,
-                address(this),
-                permitBatch.details[i].amount,
-                permitBatch.details[i].token
-            );
-        }
+        i_permit2.transferFrom(transferDetails);
 
-        emit DepositBatch(msg.sender, permitBatch.details);
+        emit DepositBatch(msg.sender, transferDetails);
     }
 
     ///
