@@ -48,12 +48,49 @@ contract Permit2BankTest is Test {
         bytes memory signature = _signPermit(permitSingle, userPrivateKey);
         permit2Bank.depositWithAllowanceTransferPermitRequired(
             permitSingle,
+            500,
             signature
         );
         vm.stopPrank();
 
-        assertEq(token1.balanceOf(address(permit2Bank)), 1000);
-        assertEq(token1.balanceOf(user), 0);
+        assertEq(token1.balanceOf(address(permit2Bank)), 500);
+        assertEq(token1.balanceOf(user), 500);
+    }
+
+    function testDepositWithAllowanceTransferPermitNotRequiredWorks() external {
+        // 1. No permit called yet
+        vm.expectRevert();
+        permit2Bank.depositWithAllowanceTransferPermitNotRequired(
+            address(token1),
+            1000
+        );
+
+        // 2. Call the permit first before directly depositing
+
+        IAllowanceTransfer.PermitSingle
+            memory permitSingle = _generatePermitSingle(
+                address(token1),
+                1000,
+                type(uint48).max,
+                0,
+                type(uint256).max
+            );
+
+        vm.startPrank(user);
+        bytes memory signature = _signPermit(permitSingle, userPrivateKey);
+        permit2Bank.depositWithAllowanceTransferPermitRequired(
+            permitSingle,
+            500,
+            signature
+        );
+
+        // now we can directly deposit since we still have 500 allowance left
+
+        permit2Bank.depositWithAllowanceTransferPermitNotRequired(
+            address(token1),
+            500
+        );
+        vm.stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
