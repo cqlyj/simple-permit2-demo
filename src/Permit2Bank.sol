@@ -549,6 +549,41 @@ contract Permit2Bank is EIP712 {
             );
     }
 
+    function getPermitBatchTransferFromHash(
+        ISignatureTransfer.PermitBatchTransferFrom calldata permitBatchFrom,
+        address spender
+    ) external view returns (bytes32) {
+        bytes32[] memory tokenPermissionHashes = new bytes32[](
+            permitBatchFrom.permitted.length
+        );
+        for (uint256 i = 0; i < permitBatchFrom.permitted.length; i++) {
+            tokenPermissionHashes[i] = keccak256(
+                abi.encode(
+                    PermitHash._TOKEN_PERMISSIONS_TYPEHASH,
+                    permitBatchFrom.permitted[i].token,
+                    permitBatchFrom.permitted[i].amount
+                )
+            );
+        }
+
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    i_permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PermitHash._PERMIT_BATCH_TRANSFER_FROM_TYPEHASH,
+                            keccak256(abi.encodePacked(tokenPermissionHashes)),
+                            spender,
+                            permitBatchFrom.nonce,
+                            permitBatchFrom.deadline
+                        )
+                    )
+                )
+            );
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 GETTERS
     //////////////////////////////////////////////////////////////*/
