@@ -210,6 +210,29 @@ contract Permit2BankTest is Test {
         assertEq(token2.balanceOf(user), 200);
     }
 
+    function testDepositWithSignatureTransferWithoutWitnessWorks() external {
+        ISignatureTransfer.PermitTransferFrom
+            memory permitTransferFrom = _generatePermitTransferFrom(
+                address(token1),
+                1000,
+                0,
+                type(uint256).max
+            );
+
+        bytes memory signature = _signPermit(
+            permitTransferFrom,
+            userPrivateKey
+        );
+        vm.prank(user);
+        permit2Bank.depositWithSignatureTransferWithoutWitness(
+            permitTransferFrom,
+            signature
+        );
+
+        assertEq(token1.balanceOf(address(permit2Bank)), 1000);
+        assertEq(token1.balanceOf(user), 0);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -287,6 +310,23 @@ contract Permit2BankTest is Test {
         return allowanceTransferDetails;
     }
 
+    function _generatePermitTransferFrom(
+        address token,
+        uint256 amount,
+        uint256 nonce,
+        uint256 deadline // deadline for signature
+    ) internal pure returns (ISignatureTransfer.PermitTransferFrom memory) {
+        return
+            ISignatureTransfer.PermitTransferFrom({
+                permitted: ISignatureTransfer.TokenPermissions({
+                    token: token,
+                    amount: amount
+                }),
+                nonce: nonce,
+                deadline: deadline
+            });
+    }
+
     function _signPermit(
         IAllowanceTransfer.PermitSingle memory permitSingle,
         uint256 privateKey
@@ -302,6 +342,19 @@ contract Permit2BankTest is Test {
         uint256 privateKey
     ) internal view returns (bytes memory) {
         bytes32 digest = permit2Bank.getPermitBatchHash(permitBatch);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        // NOTE: It's not v, r, s, but r, s, v
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signPermit(
+        ISignatureTransfer.PermitTransferFrom memory permitTransferFrom,
+        uint256 privateKey
+    ) internal view returns (bytes memory) {
+        bytes32 digest = permit2Bank.getPermitTransferFromHash(
+            permitTransferFrom,
+            address(permit2Bank)
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         // NOTE: It's not v, r, s, but r, s, v
         return abi.encodePacked(r, s, v);
