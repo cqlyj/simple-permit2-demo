@@ -233,6 +233,42 @@ contract Permit2BankTest is Test {
         assertEq(token1.balanceOf(user), 0);
     }
 
+    function testDepositWithSignatureTransferWithWitnessWorks() external {
+        ISignatureTransfer.PermitTransferFrom
+            memory permitTransferFrom = _generatePermitTransferFrom(
+                address(token1),
+                1000,
+                0,
+                type(uint256).max
+            );
+
+        bytes memory signature = _signPermit(
+            permitTransferFrom,
+            userPrivateKey,
+            user
+        );
+
+        vm.prank(user);
+        permit2Bank.depositWithSignatureTransferWithWitness(
+            permitTransferFrom,
+            user,
+            signature
+        );
+
+        assertEq(token1.balanceOf(address(permit2Bank)), 1000);
+        assertEq(token1.balanceOf(user), 0);
+    }
+
+    function testDepositBatchWithSignatureTransferWithoutWitnessWorks()
+        external
+    {}
+
+    function testDepositBatchWithSignatureTransferWithWitnessWorks() external {}
+
+    function testWithdrawWorks() external {}
+
+    function testWithdrawBatchWorks() external {}
+
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
@@ -354,6 +390,21 @@ contract Permit2BankTest is Test {
         bytes32 digest = permit2Bank.getPermitTransferFromHash(
             permitTransferFrom,
             address(permit2Bank)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        // NOTE: It's not v, r, s, but r, s, v
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signPermit(
+        ISignatureTransfer.PermitTransferFrom memory permitTransferFrom,
+        uint256 privateKey,
+        address witnessParam
+    ) internal view returns (bytes memory) {
+        bytes32 digest = permit2Bank.getPermitWitnessTransferFromHash(
+            permitTransferFrom,
+            address(permit2Bank),
+            witnessParam
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         // NOTE: It's not v, r, s, but r, s, v
