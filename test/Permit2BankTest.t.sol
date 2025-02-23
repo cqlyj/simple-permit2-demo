@@ -35,33 +35,58 @@ contract Permit2BankTest is Test {
     }
 
     function testDepositWithAllowanceTransferPermitRequiredWorks() external {
-        IAllowanceTransfer.PermitSingle memory permitSingle = IAllowanceTransfer
-            .PermitSingle({
-                details: IAllowanceTransfer.PermitDetails({
-                    token: address(token1),
-                    amount: 1000,
-                    expiration: type(uint48).max,
-                    nonce: 0
-                }),
-                spender: address(permit2Bank),
-                sigDeadline: type(uint256).max
-            });
+        IAllowanceTransfer.PermitSingle
+            memory permitSingle = _generatePermitSingle(
+                address(token1),
+                1000,
+                type(uint48).max,
+                0,
+                type(uint256).max
+            );
 
         vm.startPrank(user);
-
-        bytes32 digest = permit2Bank.getPermitSingleHash(permitSingle);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, digest);
-        // NOTE: It's not v, r, s, but r, s, v
-        bytes memory signature = abi.encodePacked(r, s, v);
-
+        bytes memory signature = _signPermit(permitSingle, userPrivateKey);
         permit2Bank.depositWithAllowanceTransferPermitRequired(
             permitSingle,
             signature
         );
-
         vm.stopPrank();
 
         assertEq(token1.balanceOf(address(permit2Bank)), 1000);
         assertEq(token1.balanceOf(user), 0);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            HELPER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _generatePermitSingle(
+        address token,
+        uint160 amount,
+        uint48 expiration,
+        uint48 nonce,
+        uint256 sigDeadline
+    ) internal view returns (IAllowanceTransfer.PermitSingle memory) {
+        return
+            IAllowanceTransfer.PermitSingle({
+                details: IAllowanceTransfer.PermitDetails({
+                    token: token,
+                    amount: amount,
+                    expiration: expiration,
+                    nonce: nonce
+                }),
+                spender: address(permit2Bank),
+                sigDeadline: sigDeadline
+            });
+    }
+
+    function _signPermit(
+        IAllowanceTransfer.PermitSingle memory permitSingle,
+        uint256 privateKey
+    ) internal view returns (bytes memory) {
+        bytes32 digest = permit2Bank.getPermitSingleHash(permitSingle);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        // NOTE: It's not v, r, s, but r, s, v
+        return abi.encodePacked(r, s, v);
     }
 }
