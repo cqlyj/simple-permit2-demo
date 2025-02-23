@@ -261,7 +261,55 @@ contract Permit2BankTest is Test {
 
     function testDepositBatchWithSignatureTransferWithoutWitnessWorks()
         external
-    {}
+    {
+        ISignatureTransfer.TokenPermissions[]
+            memory permitted = new ISignatureTransfer.TokenPermissions[](2);
+        permitted[0] = ISignatureTransfer.TokenPermissions({
+            token: address(token1),
+            amount: 1000
+        });
+        permitted[1] = ISignatureTransfer.TokenPermissions({
+            token: address(token2),
+            amount: 1000
+        });
+
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permitBatchTransferFrom = _generatePermitBatchTransferFrom(
+                permitted,
+                0,
+                type(uint256).max
+            );
+
+        address[] memory to = new address[](2);
+        to[0] = address(permit2Bank);
+        to[1] = address(permit2Bank);
+        uint256[] memory requestedAmount = new uint256[](2);
+        requestedAmount[0] = 500;
+        requestedAmount[1] = 500;
+
+        ISignatureTransfer.SignatureTransferDetails[]
+            memory signatureTransferDetails = _generateSignatureTransferDetails(
+                to,
+                requestedAmount
+            );
+
+        bytes memory signature = _signPermit(
+            permitBatchTransferFrom,
+            userPrivateKey
+        );
+
+        vm.prank(user);
+        permit2Bank.depositBatchWithSignatureTransferWithoutWitness(
+            permitBatchTransferFrom,
+            signatureTransferDetails,
+            signature
+        );
+
+        assertEq(token1.balanceOf(address(permit2Bank)), 500);
+        assertEq(token2.balanceOf(address(permit2Bank)), 500);
+        assertEq(token1.balanceOf(user), 500);
+        assertEq(token2.balanceOf(user), 500);
+    }
 
     function testDepositBatchWithSignatureTransferWithWitnessWorks() external {}
 
@@ -363,6 +411,45 @@ contract Permit2BankTest is Test {
             });
     }
 
+    function _generatePermitBatchTransferFrom(
+        ISignatureTransfer.TokenPermissions[] memory permitted,
+        uint256 nonce,
+        uint256 deadline // deadline for signature
+    )
+        internal
+        pure
+        returns (ISignatureTransfer.PermitBatchTransferFrom memory)
+    {
+        return
+            ISignatureTransfer.PermitBatchTransferFrom({
+                permitted: permitted,
+                nonce: nonce,
+                deadline: deadline
+            });
+    }
+
+    function _generateSignatureTransferDetails(
+        address[] memory to,
+        uint256[] memory requestedAmount
+    )
+        internal
+        pure
+        returns (ISignatureTransfer.SignatureTransferDetails[] memory)
+    {
+        ISignatureTransfer.SignatureTransferDetails[]
+            memory signatureTransferDetails = new ISignatureTransfer.SignatureTransferDetails[](
+                to.length
+            );
+        for (uint256 i = 0; i < to.length; i++) {
+            signatureTransferDetails[i] = ISignatureTransfer
+                .SignatureTransferDetails({
+                    to: to[i],
+                    requestedAmount: requestedAmount[i]
+                });
+        }
+        return signatureTransferDetails;
+    }
+
     function _signPermit(
         IAllowanceTransfer.PermitSingle memory permitSingle,
         uint256 privateKey
@@ -405,6 +492,20 @@ contract Permit2BankTest is Test {
             permitTransferFrom,
             address(permit2Bank),
             witnessParam
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        // NOTE: It's not v, r, s, but r, s, v
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signPermit(
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permitBatchTransferFrom,
+        uint256 privateKey
+    ) internal view returns (bytes memory) {
+        bytes32 digest = permit2Bank.getPermitBatchTransferFromHash(
+            permitBatchTransferFrom,
+            address(permit2Bank)
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         // NOTE: It's not v, r, s, but r, s, v
