@@ -5,7 +5,6 @@ import {IPermit2, IAllowanceTransfer, ISignatureTransfer} from "permit2/src/inte
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {PermitHash} from "permit2/src/libraries/PermitHash.sol";
 
 /// @title Permit2Bank
@@ -451,7 +450,7 @@ contract Permit2Bank is EIP712 {
         IAllowanceTransfer.PermitBatch calldata permitBatch
     ) external view returns (bytes32) {
         bytes32 permitDetailsHash;
-        
+
         bytes32[] memory contentHashes = new bytes32[](
             permitBatch.details.length
         );
@@ -480,6 +479,34 @@ contract Permit2Bank is EIP712 {
                             permitDetailsHash,
                             permitBatch.spender,
                             permitBatch.sigDeadline
+                        )
+                    )
+                )
+            );
+    }
+
+    function getPermitTransferFromHash(
+        ISignatureTransfer.PermitTransferFrom calldata permitFrom,
+        address spender
+    ) external view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    i_permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PermitHash._PERMIT_TRANSFER_FROM_TYPEHASH,
+                            keccak256(
+                                abi.encode(
+                                    PermitHash._TOKEN_PERMISSIONS_TYPEHASH,
+                                    permitFrom.permitted.token,
+                                    permitFrom.permitted.amount
+                                )
+                            ),
+                            spender,
+                            permitFrom.nonce,
+                            permitFrom.deadline
                         )
                     )
                 )
