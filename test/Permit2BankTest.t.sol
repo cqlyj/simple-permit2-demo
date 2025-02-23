@@ -311,7 +311,57 @@ contract Permit2BankTest is Test {
         assertEq(token2.balanceOf(user), 500);
     }
 
-    function testDepositBatchWithSignatureTransferWithWitnessWorks() external {}
+    function testDepositBatchWithSignatureTransferWithWitnessWorks() external {
+        ISignatureTransfer.TokenPermissions[]
+            memory permitted = new ISignatureTransfer.TokenPermissions[](2);
+        permitted[0] = ISignatureTransfer.TokenPermissions({
+            token: address(token1),
+            amount: 1000
+        });
+        permitted[1] = ISignatureTransfer.TokenPermissions({
+            token: address(token2),
+            amount: 1000
+        });
+
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permitBatchTransferFrom = _generatePermitBatchTransferFrom(
+                permitted,
+                0,
+                type(uint256).max
+            );
+
+        address[] memory to = new address[](2);
+        to[0] = address(permit2Bank);
+        to[1] = address(permit2Bank);
+        uint256[] memory requestedAmount = new uint256[](2);
+        requestedAmount[0] = 500;
+        requestedAmount[1] = 500;
+
+        ISignatureTransfer.SignatureTransferDetails[]
+            memory signatureTransferDetails = _generateSignatureTransferDetails(
+                to,
+                requestedAmount
+            );
+
+        bytes memory signature = _signPermit(
+            permitBatchTransferFrom,
+            userPrivateKey,
+            user
+        );
+
+        vm.prank(user);
+        permit2Bank.depositBatchWithSignatureTransferWithWitness(
+            permitBatchTransferFrom,
+            signatureTransferDetails,
+            user,
+            signature
+        );
+
+        assertEq(token1.balanceOf(address(permit2Bank)), 500);
+        assertEq(token2.balanceOf(address(permit2Bank)), 500);
+        assertEq(token1.balanceOf(user), 500);
+        assertEq(token2.balanceOf(user), 500);
+    }
 
     function testWithdrawWorks() external {}
 
@@ -506,6 +556,22 @@ contract Permit2BankTest is Test {
         bytes32 digest = permit2Bank.getPermitBatchTransferFromHash(
             permitBatchTransferFrom,
             address(permit2Bank)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
+        // NOTE: It's not v, r, s, but r, s, v
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _signPermit(
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permitBatchTransferFrom,
+        uint256 privateKey,
+        address witnessParam
+    ) internal view returns (bytes memory) {
+        bytes32 digest = permit2Bank.getPermitBatchWitnessTransferFromHash(
+            permitBatchTransferFrom,
+            address(permit2Bank),
+            witnessParam
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, digest);
         // NOTE: It's not v, r, s, but r, s, v
