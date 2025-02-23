@@ -4,13 +4,16 @@ pragma solidity 0.8.26;
 import {IPermit2, IAllowanceTransfer, ISignatureTransfer} from "permit2/src/interfaces/IPermit2.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {PermitHash} from "permit2/src/libraries/PermitHash.sol";
 
 /// @title Permit2Bank
 /// @author Luo Yingjie
 /// @notice This is a simple bank that users can deposit ERC20 tokens into using Permit2, which they can later withdraw.
 /// @notice Normally this requires granting an allowance to the bank contract and then having the bank perform the transferFrom() on the token itself
 /// @notice but Permit2 allows us to skip that hassle!
-contract Permit2Bank {
+contract Permit2Bank is EIP712 {
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
@@ -86,7 +89,7 @@ contract Permit2Bank {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
 
-    constructor(address _i_permit2) {
+    constructor(address _i_permit2) EIP712("Permit2Bank", "1") {
         i_permit2 = IPermit2(_i_permit2);
     }
 
@@ -406,6 +409,38 @@ contract Permit2Bank {
             );
         }
         s_userToTokenAmount[user][token] -= amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            HELPER FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function getPermitSingleHash(
+        IAllowanceTransfer.PermitSingle calldata permitSingle
+    ) external view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    i_permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            PermitHash._PERMIT_SINGLE_TYPEHASH,
+                            keccak256(
+                                abi.encode(
+                                    PermitHash._PERMIT_DETAILS_TYPEHASH,
+                                    permitSingle.details.token,
+                                    permitSingle.details.amount,
+                                    permitSingle.details.expiration,
+                                    permitSingle.details.nonce
+                                )
+                            ),
+                            permitSingle.spender,
+                            permitSingle.sigDeadline
+                        )
+                    )
+                )
+            );
     }
 
     /*//////////////////////////////////////////////////////////////
