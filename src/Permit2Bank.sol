@@ -42,6 +42,10 @@ contract Permit2Bank is EIP712 {
 
     // The type hash must hash our created witness struct.
     bytes32 constant WITNESS_TYPEHASH = keccak256("Witness(address user)");
+    bytes32 constant WITNESS_FULL_TYPEHASH =
+        keccak256(
+            "PermitWitnessTransferFrom(TokenPermissions permitted,address spender,uint256 nonce,uint256 deadline,Witness witness)TokenPermissions(address token,uint256 amount)Witness(address user)"
+        );
 
     /*//////////////////////////////////////////////////////////////
                                 STRUCTS
@@ -507,6 +511,38 @@ contract Permit2Bank is EIP712 {
                             spender,
                             permitFrom.nonce,
                             permitFrom.deadline
+                        )
+                    )
+                )
+            );
+    }
+
+    function getPermitWitnessTransferFromHash(
+        ISignatureTransfer.PermitTransferFrom calldata permitFrom,
+        address spender,
+        address user
+    ) external view returns (bytes32) {
+        return
+            keccak256(
+                abi.encodePacked(
+                    "\x19\x01",
+                    i_permit2.DOMAIN_SEPARATOR(),
+                    keccak256(
+                        abi.encode(
+                            WITNESS_FULL_TYPEHASH,
+                            keccak256(
+                                abi.encode(
+                                    PermitHash._TOKEN_PERMISSIONS_TYPEHASH,
+                                    permitFrom.permitted.token,
+                                    permitFrom.permitted.amount
+                                )
+                            ),
+                            spender,
+                            permitFrom.nonce,
+                            permitFrom.deadline,
+                            keccak256(
+                                abi.encode(WITNESS_TYPEHASH, Witness(user))
+                            )
                         )
                     )
                 )
