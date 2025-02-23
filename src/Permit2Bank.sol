@@ -99,6 +99,9 @@ contract Permit2Bank is EIP712 {
 
     ///
     /// @param permitSingle The permit message signed for a single token allowance
+    /// @param amountToDeposit The actual amount you want to deposit
+    /// @dev This is different from the amount in the permit message, which is the maximum amount you allow the spender to transfer
+    /// @dev It can be less than or equal to the amount in the permit message
     /// @param signature The off-chain signature for the permit message
     /// @dev The PermitSingle struct is defined in IAllowanceTransfer.sol contains the following fields:
     /// @dev - PermitDetails details
@@ -114,6 +117,7 @@ contract Permit2Bank is EIP712 {
     /// @notice the permit() call increments a nonce associated with a particular owner, token, and spender for each signature to prevent double spend type attacks.
     function depositWithAllowanceTransferPermitRequired(
         IAllowanceTransfer.PermitSingle calldata permitSingle,
+        uint256 amountToDeposit,
         bytes calldata signature
     ) external {
         // This contract must have spending permissions for the user.
@@ -123,7 +127,7 @@ contract Permit2Bank is EIP712 {
         // Credit the caller
         s_userToTokenAmount[msg.sender][
             permitSingle.details.token
-        ] += permitSingle.details.amount;
+        ] += amountToDeposit;
 
         // owner is explicitly msg.sender
         i_permit2.permit(msg.sender, permitSingle, signature);
@@ -131,15 +135,11 @@ contract Permit2Bank is EIP712 {
         i_permit2.transferFrom(
             msg.sender,
             address(this),
-            permitSingle.details.amount,
+            uint160(amountToDeposit),
             permitSingle.details.token
         );
 
-        emit Deposit(
-            msg.sender,
-            permitSingle.details.token,
-            permitSingle.details.amount
-        );
+        emit Deposit(msg.sender, permitSingle.details.token, amountToDeposit);
     }
 
     ///
