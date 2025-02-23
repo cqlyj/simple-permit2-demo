@@ -159,6 +159,8 @@ contract Permit2Bank is EIP712 {
 
     ///
     /// @param permitBatch The permit message signed for multiple token allowances
+    /// @param transferDetails The actual transfer details for each token
+    /// @dev The token amount can be less than or equal to the amount in the permit message
     /// @param signature The off-chain signature for the permit message
     /// @dev The PermitBatch struct is defined in IAllowanceTransfer.sol with the only one field changed from PermitSingle:
     /// @dev - PermitDetails[] details
@@ -175,8 +177,8 @@ contract Permit2Bank is EIP712 {
         // Credit the caller
         for (uint256 i = 0; i < permitBatch.details.length; i++) {
             s_userToTokenAmount[msg.sender][
-                permitBatch.details[i].token
-            ] += permitBatch.details[i].amount;
+                transferDetails[i].token
+            ] += transferDetails[i].amount;
         }
 
         // owner is explicitly msg.sender
@@ -188,6 +190,8 @@ contract Permit2Bank is EIP712 {
         emit DepositBatch(msg.sender, transferDetails);
     }
 
+    ///
+    /// @param transferDetails The actual transfer details for each token
     function depositBatchWithAllowanceTransferPermitNotRequired(
         IAllowanceTransfer.AllowanceTransferDetails[] calldata transferDetails
     ) external {
