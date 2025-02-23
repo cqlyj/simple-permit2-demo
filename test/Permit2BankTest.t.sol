@@ -363,9 +363,78 @@ contract Permit2BankTest is Test {
         assertEq(token2.balanceOf(user), 500);
     }
 
-    function testWithdrawWorks() external {}
+    function testWithdrawWorks() external {
+        IAllowanceTransfer.PermitSingle
+            memory permitSingle = _generatePermitSingle(
+                address(token1),
+                1000,
+                type(uint48).max,
+                0,
+                type(uint256).max
+            );
 
-    function testWithdrawBatchWorks() external {}
+        vm.startPrank(user);
+        bytes memory signature = _signPermit(permitSingle, userPrivateKey);
+        permit2Bank.depositWithAllowanceTransferPermitRequired(
+            permitSingle,
+            500,
+            signature
+        );
+        vm.stopPrank();
+
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token1)), 500);
+
+        vm.prank(user);
+        permit2Bank.withdraw(address(token1), 500, user);
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token1)), 0);
+        assertEq(token1.balanceOf(user), 1000);
+    }
+
+    function testWithdrawBatchWorks() external {
+        address[] memory tokens = new address[](2);
+        tokens[0] = address(token1);
+        tokens[1] = address(token2);
+
+        uint160[] memory amounts = new uint160[](2);
+        amounts[0] = 1000;
+        amounts[1] = 1000;
+
+        IAllowanceTransfer.PermitBatch
+            memory permitBatch = _generatePermitBatch(
+                tokens,
+                amounts,
+                type(uint48).max,
+                0,
+                type(uint256).max
+            );
+
+        IAllowanceTransfer.AllowanceTransferDetails[]
+            memory allowanceTransferDetails = _generateAllowanceTransferDetails(
+                user,
+                address(permit2Bank),
+                amounts,
+                tokens
+            );
+
+        vm.startPrank(user);
+        bytes memory signature = _signPermit(permitBatch, userPrivateKey);
+        permit2Bank.depositBatchWithAllowanceTransferPermitRequired(
+            permitBatch,
+            allowanceTransferDetails,
+            signature
+        );
+        vm.stopPrank();
+
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token1)), 1000);
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token2)), 1000);
+
+        vm.prank(user);
+        permit2Bank.withdrawBatch(tokens, amounts, user);
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token1)), 0);
+        assertEq(permit2Bank.getUserTokenAmount(user, address(token2)), 0);
+        assertEq(token1.balanceOf(user), 1000);
+        assertEq(token2.balanceOf(user), 1000);
+    }
 
     /*//////////////////////////////////////////////////////////////
                             HELPER FUNCTIONS
