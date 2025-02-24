@@ -22,4 +22,5 @@ get-user-token-amount:
 
 withdraw:
 	@forge script script/Withdraw.s.sol:Withdraw --rpc-url $(ANVIL_RPC_URL) --account default --sender 0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266 --broadcast -vvvv
-	
+
+demo : deployPermit2 deployPermit2Bank deposit get-user-token-amount withdraw get-user-token-amount
